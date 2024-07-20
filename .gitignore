@@ -1,2 +1,6 @@
 # enviroments
 .env
+
+# python caches
+__pycache__
+*.pyc
