@@ -1,6 +1,6 @@
 import torch
 
-torch.manual_seed(1337)
+torch.manual_seed(1)
 
 
 # the number of programs to simulate in
@@ -8,10 +8,10 @@ torch.manual_seed(1337)
 num_programs = 4
 
 # the length of each program's tape
-tape_length = 10
+tape_length = 64
 
 # each memory cell in the tape is a single byte, meaning we have 2^8 possible instructions
-instruction_space_size = 11
+instruction_space_size = 256
 
 
 # the structure of the token. We use the same structure
@@ -76,67 +76,71 @@ def initialize() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
             .reshape((num_programs, tape_length, 1)),
             #
             # NOTE(Nic): program data: sampled uniformly from all possible bytes.
-            # torch.randint(7, 9, size=(num_programs, tape_length, 1)),
-            torch.tensor(
-                [
-                    [
-                        [9],
-                        [9],
-                        [3],
-                        [3],
-                        [3],
-                        [0],
-                        [10],
-                        [0],
-                        [0],
-                        [0],
-                    ],
-                    [
-                        [9],
-                        [10],
-                        [3],
-                        [9],
-                        [3],
-                        [1],
-                        [0],
-                        [0],
-                        [10],
-                        [0],
-                    ],
-                    [
-                        [0],
-                        [9],
-                        [0],
-                        [10],
-                        [0],
-                        [0],
-                        [10],
-                        [0],
-                        [0],
-                        [0],
-                    ],
-                    [
-                        [0],
-                        [9],
-                        [3],
-                        [9],
-                        [10],
-                        [0],
-                        [0],
-                        [10],
-                        [0],
-                        [0],
-                    ],
-                ]
+            torch.randint(
+                0, instruction_space_size, size=(num_programs, tape_length, 1)
             ),
+            # torch.tensor(
+            #     [
+            #         [
+            #             [9],
+            #             [9],
+            #             [3],
+            #             [3],
+            #             [3],
+            #             [0],
+            #             [10],
+            #             [0],
+            #             [0],
+            #             [0],
+            #         ],
+            #         [
+            #             [9],
+            #             [10],
+            #             [3],
+            #             [9],
+            #             [3],
+            #             [1],
+            #             [0],
+            #             [0],
+            #             [10],
+            #             [0],
+            #         ],
+            #         [
+            #             [0],
+            #             [9],
+            #             [0],
+            #             [10],
+            #             [0],
+            #             [0],
+            #             [10],
+            #             [0],
+            #             [0],
+            #             [0],
+            #         ],
+            #         [
+            #             [0],
+            #             [9],
+            #             [3],
+            #             [9],
+            #             [10],
+            #             [0],
+            #             [0],
+            #             [10],
+            #             [0],
+            #             [0],
+            #         ],
+            #     ]
+            # ),
         ),
         dim=-1,
     )
 
-    # data = torch.zeros((num_programs, 3), dtype=torch.int32)
+    data = torch.zeros((num_programs, 3), dtype=torch.int32)
 
     # NOTE(Nic): initializing it this way for debugging.
-    data = torch.tensor([[1, 5, 1], [1, 5, 1], [3, 4, 1], [1, 0, 1]], dtype=torch.int32)
+    # data = torch.tensor(
+    #     [[63, 5, 1], [1, 5, 1], [63, 4, 1], [63, 0, 1]], dtype=torch.int32
+    # )
 
     running = torch.full((num_programs,), fill_value=True, dtype=torch.bool)
 
@@ -180,28 +184,28 @@ def step(soup: torch.Tensor, data: torch.Tensor, running: torch.Tensor):
     if h0_decr_idx.size(0) > 0:
         active_data = data[active_programs_idx]
         active_data[h0_decr_idx, H0_IDX] -= 1
-        # NOTE(Nic): handle the mod operation
+        active_data[h0_decr_idx, H0_IDX] %= soup.size(1)
         data[active_programs_idx] = active_data
 
     # HANDLE ">" operation
     if h0_incr_idx.size(0) > 0:
         active_data = data[active_programs_idx]
         active_data[h0_incr_idx, H0_IDX] += 1
-        # NOTE(Nic): handle the mod operation
+        active_data[h0_incr_idx, H0_IDX] %= soup.size(1)
         data[active_programs_idx] = active_data
 
     # HANDLE "{" operation
     if h1_decr_idx.size(0) > 0:
         active_data = data[active_programs_idx]
         active_data[h1_decr_idx, H1_IDX] -= 1
-        # NOTE(Nic): handle the mod operation
+        active_data[h1_decr_idx, H1_IDX] %= soup.size(1)
         data[active_programs_idx] = active_data
 
     # HANDLE "}" operation
     if h1_incr_idx.size(0) > 0:
         active_data = data[active_programs_idx]
         active_data[h1_incr_idx, H1_IDX] += 1
-        # NOTE(Nic): handle the mod operation
+        active_data[h1_incr_idx, H1_IDX] %= soup.size(0)
         data[active_programs_idx] = active_data
 
     # HANDLE "-" operation
@@ -211,9 +215,8 @@ def step(soup: torch.Tensor, data: torch.Tensor, running: torch.Tensor):
 
         p = soup[active_programs_idx]  # get all active programs
 
-        p[
-            tape_decr_idx, h0, CHAR_IDX
-        ] -= 1  # decrement the tape at the index indicated by head0
+        p[tape_decr_idx, h0, CHAR_IDX] -= 1
+        p[tape_decr_idx, h0, CHAR_IDX] %= instruction_space_size
 
         soup[active_programs_idx] = p  # write the update back into the soup.
 
@@ -224,9 +227,8 @@ def step(soup: torch.Tensor, data: torch.Tensor, running: torch.Tensor):
 
         p = soup[active_programs_idx]  # get all active programs
 
-        p[
-            tape_incr_idx, h0, CHAR_IDX
-        ] += 1  # decrement the tape at the index indicated by head0
+        p[tape_incr_idx, h0, CHAR_IDX] += 1
+        p[tape_incr_idx, h0, CHAR_IDX] %= instruction_space_size
 
         soup[active_programs_idx] = p  # write the update back into the soup.
 
@@ -295,8 +297,15 @@ def step(soup: torch.Tensor, data: torch.Tensor, running: torch.Tensor):
             (invalid_idx,) = torch.where(match_vals != 0)
 
             ptrs[valid_idx] = match_idx[valid_idx].to(torch.int32)
-            # 2) halt any programs that don't have a matching bracket.
-            running[invalid_idx] = False
+
+            # 2) Fever Dream of Index propagation: halt any programs that don't have a matching bracket.
+            r = running[active_programs_idx]
+            r_p = r[jump_back_idx]
+            r_pp = r_p[do_jump_idx]
+            r_pp[invalid_idx] = False
+            r_p[do_jump_idx] = r_pp
+            r[jump_back_idx] = r_p
+            running[active_programs_idx] = r
 
             # Fever Dream of Index propagation: get the updates back.
             d = data[active_programs_idx]
@@ -352,10 +361,17 @@ def step(soup: torch.Tensor, data: torch.Tensor, running: torch.Tensor):
             (invalid_idx,) = torch.where(match_vals != 0)
 
             ptrs[valid_idx] = match_idx[valid_idx].to(torch.int32)
-            # 2) halt any programs that don't have a matching bracket.
-            running[invalid_idx] = False
 
-            # Fever Dream of Index propagation: get the updates back.
+            # 2) Fever Dream of Index propagation: halt any programs that don't have a matching bracket.
+            r = running[active_programs_idx]
+            r_p = r[jump_back_idx]
+            r_pp = r_p[do_jump_idx]
+            r_pp[invalid_idx] = False
+            r_p[do_jump_idx] = r_pp
+            r[jump_back_idx] = r_p
+            running[active_programs_idx] = r
+
+            # Fever Dream of Index propagation: get the IP updates back.
             d = data[active_programs_idx]
             d_p = d[jump_back_idx]
             d_pp = d_p[do_jump_idx]
@@ -367,6 +383,9 @@ def step(soup: torch.Tensor, data: torch.Tensor, running: torch.Tensor):
     # Increment all instruction pointers of valid programs.
     (active_programs_idx,) = torch.where(running == True)
     data[active_programs_idx, IP_IDX] += 1
+    running[torch.where(data[:, IP_IDX] >= soup.size(1))] = (
+        False  # NOTE(Nic): halt programs with OOB IPs
+    )
 
 
 soup, data, running = initialize()
