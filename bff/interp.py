@@ -12,23 +12,32 @@ H0_IDX = 1
 H1_IDX = 2
 
 
-def initialize(
-    *, num_programs: int, tape_length: int, instruction_space_size: int
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def initialize_soup(
+    *,
+    num_programs: int,
+    tape_length: int,
+    instruction_space_size: int,
+    random_state: torch.Generator | None,
+) -> torch.Tensor:
     soup = torch.cat(
         (
             #
             # NOTE(Nic): epoch number. all programs start at epoch 0.
             torch.full((num_programs, tape_length, 1), fill_value=0, dtype=torch.int32),
             #
-            # NOTE(Nic): position. shows the original position of each token in the tape.
-            torch.arange(0, tape_length)
-            .repeat(num_programs)
-            .reshape((num_programs, tape_length, 1)),
+            # NOTE(Nic): position. shows the original program index that each token belonged to at initialization.
+            torch.arange(0, num_programs)
+            .repeat(tape_length)
+            .reshape(tape_length, num_programs)
+            .transpose(0, 1)
+            .unsqueeze(-1),
             #
             # NOTE(Nic): program data: sampled uniformly from all possible bytes.
             torch.randint(
-                0, instruction_space_size, size=(num_programs, tape_length, 1)
+                0,
+                instruction_space_size,
+                size=(num_programs, tape_length, 1),
+                generator=random_state,
             ),
             # torch.tensor(
             #     [
@@ -86,6 +95,13 @@ def initialize(
         dim=-1,
     )
 
+    return soup
+
+
+def initialize_data(
+    *,
+    num_programs: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
     data = torch.zeros((num_programs, 3), dtype=torch.int32)
 
     # NOTE(Nic): initializing it this way for debugging.
@@ -95,7 +111,7 @@ def initialize(
 
     running = torch.full((num_programs,), fill_value=True, dtype=torch.bool)
 
-    return soup, data, running
+    return data, running
 
 
 def step(
