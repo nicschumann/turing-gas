@@ -1,4 +1,6 @@
 import torch
+from torch import Tensor
+from jaxtyping import Int, Bool
 
 # the structure of the token. We use the same structure
 # as in Aguera y Arcas et al: (epoch_created, position_in_tape, character)
@@ -18,7 +20,7 @@ def initialize_soup(
     tape_length: int,
     instruction_space_size: int,
     random_state: torch.Generator | None,
-) -> torch.Tensor:
+) -> Int[Tensor, "programs length data"]:
     soup = torch.cat(
         (
             #
@@ -101,7 +103,7 @@ def initialize_soup(
 def initialize_data(
     *,
     num_programs: int,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[Int[Tensor, "programs data"], Bool[Tensor, "programs"]]:
     data = torch.zeros((num_programs, 3), dtype=torch.int32)
 
     # NOTE(Nic): initializing it this way for debugging.

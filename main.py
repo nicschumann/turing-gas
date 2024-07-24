@@ -1,8 +1,8 @@
 import torch
 
-from bff.interp import initialize_soup, initialize_data
+from bff.interp import initialize_soup, initialize_data, step
 from bff.select import select
-from bff.debug import decompile
+from bff.debug import pdiff
 
 
 # the number of programs to simulate in
@@ -31,14 +31,23 @@ soup = initialize_soup(
 
 
 paired_programs, random_indices = select(soup, random_state=generator)
+pre_execution_programs = paired_programs.clone()
 
-print(paired_programs)
-print(random_indices)
 
 data, running = initialize_data(num_programs=num_programs // 2)
 
+# print(paired_programs[0])
 
-for i in range(num_programs // 2):
-    decompile(paired_programs[i], data[i], running[i])
+for i in range(129):
+    step(paired_programs, data, running, instruction_space_size=instruction_space_size)
+
+
+p_idx = 0
+pdiff(
+    pre_execution_programs[p_idx],
+    torch.zeros((3,)),
+    paired_programs[p_idx],
+    data[p_idx],
+)
 
 # step(soup_before, data_before, running_before, instruction_space_size=256)

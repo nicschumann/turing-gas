@@ -1,3 +1,6 @@
+from torch import Tensor
+from jaxtyping import Int
+
 from math import floor
 
 import torch
@@ -6,11 +9,11 @@ torch.manual_seed(1)
 
 
 def select(
-    soup: torch.Tensor,
+    soup: Int[Tensor, "programs length data"],
     *,
     selected_percentage: float = 1.0,
     random_state: torch.Generator,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[Int[Tensor, "programs length data"], Int[Tensor, "indices"]]:
     """Given a current state for the soup, randomly select pairs from the
     soup, concatenate them, and return them, as well as their original indices,
     so they can be returned from the soup in the correct positions.

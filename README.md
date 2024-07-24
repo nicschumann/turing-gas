@@ -10,7 +10,7 @@ As an accompanyment to this repository, I'm also interested in producing a detai
 
 ## Setup
 
-This repo is intended to be dependency-minimal. The only dependency required to run the core simulation is `pytorch`. Visualization requires additional layers to make your terminal prettier.
+This repo is intended to be dependency-minimal. The only dependency required to run the core simulation is `pytorch` (although we also use `jaxtyping` to type our tensors). Visualization requires additional layers to make your terminal prettier.
 
 Install requirements in a virtual environment through `pip`.
 
