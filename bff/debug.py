@@ -42,12 +42,12 @@ def pdiff(
         border_style="bright_black",
     )
     table.add_column("line", width=12)
-    table.add_column("p1", width=3)
+    table.add_column("p1", width=11)
     table.add_column("ip", width=2)
     table.add_column("h0", width=2)
     table.add_column("h1", width=2)
     table.add_column("", no_wrap=True, min_width=35)
-    table.add_column("p2", width=3)
+    table.add_column("p2", width=11)
     table.add_column("ip", width=2)
     table.add_column("h0", width=2)
     table.add_column("h1", width=2)
@@ -103,7 +103,7 @@ def pdiff(
         ):
             table.add_row(
                 f"[{color}]{i:3d}[/{color}]",
-                f"[{color}]{p1_e.item()}/{p1_pnum.item()}[/{color}]",
+                f"[{color}]{p1_e.item()}:{p1_pnum.item()}[/{color}]",
                 Text(
                     "ip" if p1_ip_here else "",
                     style="bold yellow" if p1_ip_here else "",
@@ -117,7 +117,7 @@ def pdiff(
                     style="bold dodger_blue2" if p1_h1_here else "",
                 ),
                 p1_instr_text,
-                f"[{color}]{p1_e.item()}/{p1_pnum.item()}[/{color}]",
+                f"[{color}]{p2_e.item()}:{p2_pnum.item()}[/{color}]",
                 Text(
                     "ip" if p2_ip_here else "",
                     style="bold yellow" if p2_ip_here else "",

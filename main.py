@@ -8,7 +8,8 @@ from bff.debug import pdiff
 # the number of programs to simulate in
 # our turing gas.
 # NOTE(Nic): num programs must be divisible by 2
-num_programs = 12
+num_programs = 8192
+num_steps_per_epoch = 8192
 
 # the length of each program's tape
 tape_length = 64
@@ -38,7 +39,9 @@ data, running = initialize_data(num_programs=num_programs // 2)
 
 # print(paired_programs[0])
 
-for i in range(129):
+for i in range(num_steps_per_epoch):
+    if i % 512 == 0:
+        print(i)
     step(paired_programs, data, running, instruction_space_size=instruction_space_size)
 
 
