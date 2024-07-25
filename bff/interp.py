@@ -20,15 +20,21 @@ def initialize_soup(
     tape_length: int,
     instruction_space_size: int,
     random_state: torch.Generator | None,
+    device: str,
 ) -> Int[Tensor, "programs length data"]:
     soup = torch.cat(
         (
             #
             # NOTE(Nic): epoch number. all programs start at epoch 0.
-            torch.full((num_programs, tape_length, 1), fill_value=0, dtype=torch.int32),
+            torch.full(
+                (num_programs, tape_length, 1),
+                fill_value=0,
+                dtype=torch.int32,
+                device=device,
+            ),
             #
             # NOTE(Nic): position. shows the original program index that each token belonged to at initialization.
-            torch.arange(0, num_programs)
+            torch.arange(0, num_programs, device=device)
             .repeat(tape_length)
             .reshape(tape_length, num_programs)
             .transpose(0, 1)
@@ -40,59 +46,8 @@ def initialize_soup(
                 instruction_space_size,
                 size=(num_programs, tape_length, 1),
                 generator=random_state,
+                device=device,
             ),
-            # torch.tensor(
-            #     [
-            #         [
-            #             [9],
-            #             [9],
-            #             [3],
-            #             [3],
-            #             [3],
-            #             [0],
-            #             [10],
-            #             [0],
-            #             [0],
-            #             [0],
-            #         ],
-            #         [
-            #             [9],
-            #             [10],
-            #             [3],
-            #             [9],
-            #             [3],
-            #             [1],
-            #             [0],
-            #             [0],
-            #             [10],
-            #             [0],
-            #         ],
-            #         [
-            #             [0],
-            #             [9],
-            #             [0],
-            #             [10],
-            #             [0],
-            #             [0],
-            #             [10],
-            #             [0],
-            #             [0],
-            #             [0],
-            #         ],
-            #         [
-            #             [0],
-            #             [9],
-            #             [3],
-            #             [9],
-            #             [10],
-            #             [0],
-            #             [0],
-            #             [10],
-            #             [0],
-            #             [0],
-            #         ],
-            #     ]
-            # ),
         ),
         dim=-1,
     )
@@ -101,17 +56,18 @@ def initialize_soup(
 
 
 def initialize_data(
-    *,
-    num_programs: int,
+    *, num_programs: int, device: str
 ) -> tuple[Int[Tensor, "programs data"], Bool[Tensor, "programs"]]:
-    data = torch.zeros((num_programs, 3), dtype=torch.int32)
+    data = torch.zeros((num_programs, 3), dtype=torch.int32, device=device)
 
     # NOTE(Nic): initializing it this way for debugging.
     # data = torch.tensor(
     #     [[63, 5, 1], [1, 5, 1], [63, 4, 1], [63, 0, 1]], dtype=torch.int32
     # )
 
-    running = torch.full((num_programs,), fill_value=True, dtype=torch.bool)
+    running = torch.full(
+        (num_programs,), fill_value=True, dtype=torch.bool, device=device
+    )
 
     return data, running
 
@@ -122,6 +78,7 @@ def step(
     running: torch.Tensor,
     *,
     instruction_space_size: int,
+    device: str,
 ):
     assert soup.size(0) == data.size(
         0
@@ -250,12 +207,14 @@ def step(
 
             # Find matching brackets, if there are any.
             brackets = torch.zeros_like(
-                p[do_jump_idx, :, CHAR_IDX], dtype=torch.int32
+                p[do_jump_idx, :, CHAR_IDX], dtype=torch.int32, device=device
             ).unsqueeze(-1)
 
             brackets[torch.where(p[do_jump_idx, :, CHAR_IDX] == 9)] = 1
             brackets[torch.where(p[do_jump_idx, :, CHAR_IDX] == 10)] = -1
-            ip_mask = torch.arange(brackets.size(1)).unsqueeze(0) < ptrs.unsqueeze(1)
+            ip_mask = torch.arange(brackets.size(1), device=device).unsqueeze(
+                0
+            ) < ptrs.unsqueeze(1)
             brackets[ip_mask] = 0
 
             bracket_sum = torch.cumsum(brackets, dim=-2)
@@ -312,12 +271,14 @@ def step(
 
             # Find matching brackets, if there are any.
             brackets = torch.zeros_like(
-                p[do_jump_idx, :, CHAR_IDX], dtype=torch.int32
+                p[do_jump_idx, :, CHAR_IDX], dtype=torch.int32, device=device
             ).unsqueeze(-1)
 
             brackets[torch.where(p[do_jump_idx, :, CHAR_IDX] == 9)] = 1
             brackets[torch.where(p[do_jump_idx, :, CHAR_IDX] == 10)] = -1
-            ip_mask = torch.arange(brackets.size(1)).unsqueeze(0) > ptrs.unsqueeze(1)
+            ip_mask = torch.arange(brackets.size(1), device=device).unsqueeze(
+                0
+            ) > ptrs.unsqueeze(1)
             brackets[ip_mask] = 0
 
             # NOTE(Nic): these two flip operations make copies of the

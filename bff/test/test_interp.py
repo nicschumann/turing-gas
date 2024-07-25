@@ -204,12 +204,19 @@ ids = [
 
 
 @pytest.mark.parametrize(("before", "after"), setup_tests(), ids=ids)
-def test(before: State, after: State):
+def test_cpu(before: State, after: State):
+    """Each of theses tests"""
     soup_before = torch.tensor(before.soup, dtype=torch.int32)
     data_before = torch.tensor(before.data, dtype=torch.int32)
     running_before = torch.tensor(before.running)
 
-    step(soup_before, data_before, running_before, instruction_space_size=256)
+    step(
+        soup_before,
+        data_before,
+        running_before,
+        instruction_space_size=256,
+        device="cpu",
+    )
 
     soup_after = torch.tensor(after.soup, dtype=torch.int32)
     data_after = torch.tensor(after.data, dtype=torch.int32)
@@ -236,7 +243,13 @@ def test_parallel():
     )
     running_before = torch.tensor(list(map(lambda s: s[0].running[0], tests)))
 
-    step(soup_before, data_before, running_before, instruction_space_size=256)
+    step(
+        soup_before,
+        data_before,
+        running_before,
+        instruction_space_size=256,
+        device="cpu",
+    )
 
     soup_after = torch.tensor(
         list(map(lambda s: s[1].soup[0], tests)), dtype=torch.int32
