@@ -2,7 +2,7 @@ import pytest
 import torch
 from dataclasses import dataclass
 
-from bff.interp import step
+from bff.interp import step, step2
 
 
 @dataclass
@@ -206,11 +206,11 @@ ids = [
 @pytest.mark.parametrize(("before", "after"), setup_tests(), ids=ids)
 def test_cpu(before: State, after: State):
     """Each of theses tests"""
-    soup_before = torch.tensor(before.soup, dtype=torch.int32)
-    data_before = torch.tensor(before.data, dtype=torch.int32)
+    soup_before = torch.tensor(before.soup)
+    data_before = torch.tensor(before.data)
     running_before = torch.tensor(before.running)
 
-    step(
+    s, d, r = step2(
         soup_before,
         data_before,
         running_before,
@@ -218,13 +218,13 @@ def test_cpu(before: State, after: State):
         device="cpu",
     )
 
-    soup_after = torch.tensor(after.soup, dtype=torch.int32)
-    data_after = torch.tensor(after.data, dtype=torch.int32)
+    soup_after = torch.tensor(after.soup)
+    data_after = torch.tensor(after.data)
     running_after = torch.tensor(after.running)
 
-    assert torch.equal(soup_before, soup_after)
-    assert torch.equal(data_before, data_after)
-    assert torch.equal(running_before, running_after)
+    assert torch.equal(s, soup_after)
+    assert torch.equal(d, data_after)
+    assert torch.equal(r, running_after)
 
 
 def test_parallel():
@@ -235,15 +235,11 @@ def test_parallel():
 
     tests = setup_tests()
 
-    soup_before = torch.tensor(
-        list(map(lambda s: s[0].soup[0], tests)), dtype=torch.int32
-    )
-    data_before = torch.tensor(
-        list(map(lambda s: s[0].data[0], tests)), dtype=torch.int32
-    )
+    soup_before = torch.tensor(list(map(lambda s: s[0].soup[0], tests)))
+    data_before = torch.tensor(list(map(lambda s: s[0].data[0], tests)))
     running_before = torch.tensor(list(map(lambda s: s[0].running[0], tests)))
 
-    step(
+    s, d, r = step2(
         soup_before,
         data_before,
         running_before,
@@ -251,14 +247,10 @@ def test_parallel():
         device="cpu",
     )
 
-    soup_after = torch.tensor(
-        list(map(lambda s: s[1].soup[0], tests)), dtype=torch.int32
-    )
-    data_after = torch.tensor(
-        list(map(lambda s: s[1].data[0], tests)), dtype=torch.int32
-    )
+    soup_after = torch.tensor(list(map(lambda s: s[1].soup[0], tests)))
+    data_after = torch.tensor(list(map(lambda s: s[1].data[0], tests)))
     running_after = torch.tensor(list(map(lambda s: s[1].running[0], tests)))
 
-    assert torch.equal(soup_before, soup_after)
-    assert torch.equal(data_before, data_after)
-    assert torch.equal(running_before, running_after)
+    assert torch.equal(s, soup_after)
+    assert torch.equal(d, data_after)
+    assert torch.equal(r, running_after)
