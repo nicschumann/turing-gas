@@ -1,7 +1,8 @@
 import torch
 from time import perf_counter
 
-from bff.interp import initialize_soup, initialize_data, step
+from bff.interp import initialize_soup, initialize_data
+from bff.interp import step as step
 from bff.select import select_pairs, return_pairs
 from bff.debug import pdiff
 
@@ -11,7 +12,7 @@ from bff.metrics.shannon import entropy
 # the number of programs to simulate in
 # our turing gas.
 # NOTE(Nic): num programs must be divisible by 2
-num_programs = 32
+num_programs = 128
 num_steps_per_epoch = 8192
 
 # the length of each program's tape

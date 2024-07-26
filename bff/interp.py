@@ -29,7 +29,6 @@ def initialize_soup(
             torch.full(
                 (num_programs, tape_length, 1),
                 fill_value=0,
-                dtype=torch.int32,
                 device=device,
             ),
             #
@@ -58,16 +57,8 @@ def initialize_soup(
 def initialize_data(
     *, num_programs: int, device: str
 ) -> tuple[Int[Tensor, "programs data"], Bool[Tensor, "programs"]]:
-    data = torch.zeros((num_programs, 3), dtype=torch.int32, device=device)
-
-    # NOTE(Nic): initializing it this way for debugging.
-    # data = torch.tensor(
-    #     [[63, 5, 1], [1, 5, 1], [63, 4, 1], [63, 0, 1]], dtype=torch.int32
-    # )
-
-    running = torch.full(
-        (num_programs,), fill_value=True, dtype=torch.bool, device=device
-    )
+    data = torch.zeros((num_programs, 3), dtype=torch.long, device=device)
+    running = torch.full((num_programs,), fill_value=True, device=device)
 
     return data, running
 
@@ -115,29 +106,25 @@ def step(
     # HANDLE "<" operation
     if h0_decr_idx.size(0) > 0:
         active_data = data[active_programs_idx]
-        active_data[h0_decr_idx, H0_IDX] -= 1
-        active_data[h0_decr_idx, H0_IDX] %= soup.size(1)
+        active_data[h1_decr_idx, H0_IDX].sub_(1).fmod_(soup.shape[1])
         data[active_programs_idx] = active_data
 
     # HANDLE ">" operation
     if h0_incr_idx.size(0) > 0:
         active_data = data[active_programs_idx]
-        active_data[h0_incr_idx, H0_IDX] += 1
-        active_data[h0_incr_idx, H0_IDX] %= soup.size(1)
+        active_data[h1_decr_idx, H0_IDX].add_(1).fmod_(soup.shape[1])
         data[active_programs_idx] = active_data
 
     # HANDLE "{" operation
     if h1_decr_idx.size(0) > 0:
         active_data = data[active_programs_idx]
-        active_data[h1_decr_idx, H1_IDX] -= 1
-        active_data[h1_decr_idx, H1_IDX] %= soup.size(1)
+        active_data[h1_decr_idx, H1_IDX].sub_(1).fmod_(soup.shape[1])
         data[active_programs_idx] = active_data
 
     # HANDLE "}" operation
     if h1_incr_idx.size(0) > 0:
         active_data = data[active_programs_idx]
-        active_data[h1_incr_idx, H1_IDX] += 1
-        active_data[h1_incr_idx, H1_IDX] %= soup.size(1)
+        active_data[h1_decr_idx, H1_IDX].add_(1).fmod_(soup.shape[1])
         data[active_programs_idx] = active_data
 
     # HANDLE "-" operation
@@ -147,8 +134,7 @@ def step(
 
         p = soup[active_programs_idx]  # get all active programs
 
-        p[tape_decr_idx, h0, CHAR_IDX] -= 1
-        p[tape_decr_idx, h0, CHAR_IDX] %= instruction_space_size
+        p[tape_decr_idx, h0, CHAR_IDX].sub_(1).fmod_(instruction_space_size)
 
         soup[active_programs_idx] = p  # write the update back into the soup.
 
@@ -159,8 +145,7 @@ def step(
 
         p = soup[active_programs_idx]  # get all active programs
 
-        p[tape_incr_idx, h0, CHAR_IDX] += 1
-        p[tape_incr_idx, h0, CHAR_IDX] %= instruction_space_size
+        p[tape_incr_idx, h0, CHAR_IDX].add_(1).fmod_(instruction_space_size)
 
         soup[active_programs_idx] = p  # write the update back into the soup.
 
@@ -230,7 +215,7 @@ def step(
             (valid_idx,) = torch.where(match_vals == 0)
             (invalid_idx,) = torch.where(match_vals != 0)
 
-            ptrs[valid_idx] = match_idx[valid_idx].to(torch.int32)
+            ptrs[valid_idx] = match_idx[valid_idx]
 
             # 2) Fever Dream of Index propagation: halt any programs that don't have a matching bracket.
             if invalid_idx.size(0) > 0:
@@ -298,7 +283,7 @@ def step(
             (valid_idx,) = torch.where(match_vals == 0)
             (invalid_idx,) = torch.where(match_vals != 0)
 
-            ptrs[valid_idx] = match_idx[valid_idx].to(torch.int32)
+            ptrs[valid_idx] = match_idx[valid_idx]
 
             # 2) Fever Dream of Index propagation: halt any programs that don't have a matching bracket.
             if invalid_idx.size(0) > 0:
@@ -338,7 +323,13 @@ def step2(
 ):
     num_programs, tape_length, _ = soup.shape
 
-    instructions = soup[torch.arange(num_programs, device=soup.device), data[:, IP_IDX]]
+    r = torch.arange(num_programs, device=soup.device)
+    d = data[:, IP_IDX]
+
+    instructions = soup[
+        r,
+        d,
+    ]
 
     # Update state based on instructions (only for running soup)
     update_state(
@@ -354,8 +345,6 @@ def step2(
 
     # Increment instruction pointer (only for running soup)
     data[:, IP_IDX].add_(running.long()).fmod_(tape_length)
-
-    return soup, data, running
 
 
 def update_state(
@@ -501,7 +490,12 @@ def update_programs(
 
     # Decrement program[h0]
     mask_5 = mask & (
-        soup[torch.arange(num_programs), data[:, IP_IDX], char_idx_range] == 5
+        soup[
+            torch.arange(num_programs),
+            data[:, IP_IDX],
+            char_idx_range,
+        ]
+        == 5
     )
 
     soup[mask_5, data[mask_5, H0_IDX], CHAR_IDX] = (
