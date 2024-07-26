@@ -210,7 +210,7 @@ def test_cpu(before: State, after: State):
     data_before = torch.tensor(before.data)
     running_before = torch.tensor(before.running)
 
-    s, d, r = step2(
+    step2(
         soup_before,
         data_before,
         running_before,
@@ -222,9 +222,9 @@ def test_cpu(before: State, after: State):
     data_after = torch.tensor(after.data)
     running_after = torch.tensor(after.running)
 
-    assert torch.equal(s, soup_after)
-    assert torch.equal(d, data_after)
-    assert torch.equal(r, running_after)
+    assert torch.equal(soup_before, soup_after)
+    assert torch.equal(data_before, data_after)
+    assert torch.equal(running_before, running_after)
 
 
 def test_parallel():
@@ -239,7 +239,7 @@ def test_parallel():
     data_before = torch.tensor(list(map(lambda s: s[0].data[0], tests)))
     running_before = torch.tensor(list(map(lambda s: s[0].running[0], tests)))
 
-    s, d, r = step2(
+    step2(
         soup_before,
         data_before,
         running_before,
@@ -251,6 +251,6 @@ def test_parallel():
     data_after = torch.tensor(list(map(lambda s: s[1].data[0], tests)))
     running_after = torch.tensor(list(map(lambda s: s[1].running[0], tests)))
 
-    assert torch.equal(s, soup_after)
-    assert torch.equal(d, data_after)
-    assert torch.equal(r, running_after)
+    assert torch.equal(soup_before, soup_after)
+    assert torch.equal(data_before, data_after)
+    assert torch.equal(running_before, running_after)

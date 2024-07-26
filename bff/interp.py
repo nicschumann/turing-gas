@@ -341,7 +341,7 @@ def step2(
     instructions = soup[torch.arange(num_programs, device=soup.device), data[:, IP_IDX]]
 
     # Update state based on instructions (only for running soup)
-    new_states, new_running = update_state(
+    update_state(
         soup,
         data,
         instructions,
@@ -350,16 +350,12 @@ def step2(
     )
 
     # Update soup if necessary (only for running programs)
-    new_soup = update_programs(
-        soup, new_states, new_running, instruction_space_size=instruction_space_size
-    )
+    update_programs(soup, data, running, instruction_space_size=instruction_space_size)
 
     # Increment instruction pointer (only for running soup)
-    new_states[:, 0] = torch.where(
-        new_running, (new_states[:, 0] + 1) % 128, new_states[:, 0]
-    )
+    data[:, IP_IDX].add_(running.long()).fmod_(tape_length)
 
-    return new_soup, new_states, new_running
+    return soup, data, running
 
 
 def update_state(
@@ -371,30 +367,26 @@ def update_state(
     instruction_space_size: int,
 ):
     num_programs, tape_length, _ = soup.shape
-    new_data = data.clone()
-    new_running = running.clone()
 
     mask_1 = running & (instructions[:, CHAR_IDX] == 1)  # decr h0
-    new_data[mask_1, H0_IDX] = (new_data[mask_1, H0_IDX] - 1) % soup.size(1)
+    data[mask_1, H0_IDX] = (data[mask_1, H0_IDX] - 1) % soup.size(1)
 
     mask_2 = running & (instructions[:, CHAR_IDX] == 2)  # incr h0
-    new_data[mask_2, H0_IDX] = (new_data[mask_2, H0_IDX] + 1) % soup.size(1)
+    data[mask_2, H0_IDX] = (data[mask_2, H0_IDX] + 1) % soup.size(1)
 
     mask_3 = running & (instructions[:, CHAR_IDX] == 3)  # decr h1
-    new_data[mask_3, H1_IDX] = (new_data[mask_3, H1_IDX] - 1) % soup.size(1)
+    data[mask_3, H1_IDX] = (data[mask_3, H1_IDX] - 1) % soup.size(1)
 
     mask_4 = running & (instructions[:, CHAR_IDX] == 4)  # incr h1
-    new_data[mask_4, H1_IDX] = (new_data[mask_4, H1_IDX] + 1) % soup.size(1)
+    data[mask_4, H1_IDX] = (data[mask_4, H1_IDX] + 1) % soup.size(1)
 
-    new_data, new_running = handle_jumps(
+    handle_jumps(
         soup,
-        new_data,
+        data,
         instructions,
-        new_running,
+        running,
         instruction_space_size=instruction_space_size,
     )
-
-    return new_data, new_running
 
 
 def handle_jumps(
@@ -405,8 +397,6 @@ def handle_jumps(
     *,
     instruction_space_size: int,
 ):
-    new_data = data.clone()
-    new_running = running.clone()
 
     num_programs, tape_length, _ = soup.shape
     mask_open = (
@@ -424,11 +414,8 @@ def handle_jumps(
 
     if mask_open.any():
         new_ip, success = find_matching_close(soup[mask_open], data[mask_open, IP_IDX])
-        new_data[mask_open, IP_IDX] = new_ip
-        # import code
-
-        # code.interact(local=locals())
-        new_running[mask_open] = success
+        data[mask_open, IP_IDX] = new_ip
+        running[mask_open] = success
 
     mask_close = (
         running
@@ -446,10 +433,8 @@ def handle_jumps(
         new_ip, success = find_matching_close(
             soup[mask_close], data[mask_close, IP_IDX]
         )
-        new_data[mask_close, IP_IDX] = new_ip
-        new_running[mask_close] = success
-
-    return new_data, new_running
+        data[mask_close, IP_IDX] = new_ip
+        running[mask_close] = success
 
 
 def find_matching_brackets(
@@ -506,7 +491,6 @@ def update_programs(
     *,
     instruction_space_size: int,
 ):
-    new_soup = soup.clone()
     num_programs, program_length, _ = soup.shape
     char_idx_range = torch.full(
         (num_programs,), fill_value=CHAR_IDX, device=soup.device
@@ -520,28 +504,26 @@ def update_programs(
         soup[torch.arange(num_programs), data[:, IP_IDX], char_idx_range] == 5
     )
 
-    new_soup[mask_5, data[mask_5, H0_IDX], CHAR_IDX] = (
-        new_soup[mask_5, data[mask_5, H0_IDX], CHAR_IDX] - 1
+    soup[mask_5, data[mask_5, H0_IDX], CHAR_IDX] = (
+        soup[mask_5, data[mask_5, H0_IDX], CHAR_IDX] - 1
     ) % instruction_space_size
 
     # Increment program[h0]
     mask_6 = mask & (
         soup[torch.arange(num_programs), data[:, IP_IDX], char_idx_range] == 6
     )
-    new_soup[mask_6, data[mask_6, H0_IDX], CHAR_IDX] = (
-        new_soup[mask_6, data[mask_6, H0_IDX], CHAR_IDX] + 1
+    soup[mask_6, data[mask_6, H0_IDX], CHAR_IDX] = (
+        soup[mask_6, data[mask_6, H0_IDX], CHAR_IDX] + 1
     ) % instruction_space_size
 
     # Move program[h0] to program[h1]
     mask_7 = mask & (
         soup[torch.arange(num_programs), data[:, IP_IDX], char_idx_range] == 7
     )
-    new_soup[mask_7, data[mask_7, H1_IDX]] = new_soup[mask_7, data[mask_7, H0_IDX]]
+    soup[mask_7, data[mask_7, H1_IDX]] = soup[mask_7, data[mask_7, H0_IDX]]
 
     # Move program[h1] to program[h0]
     mask_8 = mask & (
         soup[torch.arange(num_programs), data[:, IP_IDX], char_idx_range] == 8
     )
-    new_soup[mask_8, data[mask_8, H0_IDX]] = new_soup[mask_8, data[mask_8, H1_IDX]]
-
-    return new_soup
+    soup[mask_8, data[mask_8, H0_IDX]] = soup[mask_8, data[mask_8, H1_IDX]]
